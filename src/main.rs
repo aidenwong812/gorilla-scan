@@ -402,7 +402,6 @@ async fn make_token_overview_message(
     let mut _liquidity = 0.0;
     loop {
         let token_pool_page = get_token_pool(client.clone(), &dextools_api_key, &dextools_api_plan, token_address, page).await.unwrap_or_default();
-        println!("total page: {}\n{}:\t {:?}", token_pool_page.data.total_pages, token_pool_page.data.page, token_pool_page.data.results);
         for pool in &token_pool_page.data.results {
             let pool_address = &pool.address;
             let pool_liquidity = get_pool_liquidity(client.clone(), &dextools_api_key, &dextools_api_plan, pool_address).await.unwrap_or_default();
