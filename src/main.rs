@@ -2,6 +2,8 @@ pub mod token_overview;
 pub mod token_info;
 pub mod token_price_history;
 pub mod token_top50_holders;
+pub mod token_audit;
+
 use tokio::time;
 use dotenv::dotenv;
 use log::{error, info};
@@ -13,11 +15,12 @@ use teloxide::{
     types::{Me, MessageKind},
     utils::command::BotCommands,
 };
-// use chrono::{NaiveDateTime, DateTime, Utc};
+use chrono::{NaiveDateTime, DateTime, Utc};
 use token_overview::{TokenOverviewData, TokenOverview};
 use token_info::TokenInfo;
 use token_price_history::TokenPriceHistory;
 use token_top50_holders::{TokenTopHolders, HolderInfo};
+use token_audit::{TokenAudit, TokenAuditData, Tax};
 
 #[derive(BotCommands, Clone)]
 #[command(
@@ -96,15 +99,16 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
             match get_token_data(request_client.clone(), &dextools_api_key, &dextools_api_plan, &token_adr).await {
                 Ok(token_data) => {
                 tokio::time::sleep(time::Duration::from_secs(1)).await; //delay for 1 sec to avoid conflict request
-                let token_info = get_token_info(request_client.clone(), &dextools_api_key, &dextools_api_plan, &token_adr).await.unwrap();
+                let token_info = get_token_info(request_client.clone(), &dextools_api_key, &dextools_api_plan, &token_adr).await.unwrap_or_default();
                 tokio::time::sleep(time::Duration::from_secs(1)).await; //delay for 1 sec to avoid conflict request
-                let token_price_history = get_token_price_history(request_client.clone(), &dextools_api_key, &dextools_api_plan, &token_adr).await.unwrap();
+                let token_price_history = get_token_price_history(request_client.clone(), &dextools_api_key, &dextools_api_plan, &token_adr).await.unwrap_or_default();
                 tokio::time::sleep(time::Duration::from_secs(1)).await; //delay for 1 sec to avoid conflict request
-                let token_top_holders = get_top_50_holders(request_client.clone(), &debank_api_key, &token_adr).await.unwrap();
-
+                let token_top_holders = get_top_50_holders(request_client.clone(), &debank_api_key, &token_adr).await.unwrap_or_default();
+                tokio::time::sleep(time::Duration::from_secs(1)).await; //delay for 1 sec to avoid conflict request
+                let token_audit = get_token_audit(request_client.clone(), &dextools_api_key, &dextools_api_plan, &token_adr).await.unwrap_or_default();
                 //make message
                 let text =
-                    make_token_overview_message(&token_data, &token_info, &token_price_history, &token_top_holders)
+                    make_token_overview_message(&token_data, &token_info, &token_price_history, &token_top_holders, &token_audit)
                         .await?;
                     bot.send_message(msg.chat.id, text)  // Changed "text" to text
                         .parse_mode(teloxide::types::ParseMode::Html)
@@ -182,6 +186,25 @@ async fn get_token_price_history(client: Client, api_key: &str, api_plan: &str, 
     }
 }
 
+async fn get_token_audit(client: Client, api_key: &str, api_plan: &str, token_address: &str) -> Result<TokenAudit, serde_json::Error> {
+    let url = format!(
+        "https://public-api.dextools.io/{}/v2/token/{}/{}/audit",
+        api_plan, "apechain", token_address
+    );
+    let response = client
+    .get(&url)
+    .header("X-API-KEY", api_key)
+    .send()
+    .await
+    .unwrap();
+
+    let text = response.text().await.unwrap();
+    match serde_json::from_str(&text) {
+        Ok(obj) => Ok(obj),
+        Err(e) =>  Err(e),
+    }
+}
+
 async fn get_top_50_holders(
     client: Client,
     api_key: &str,
@@ -206,19 +229,21 @@ async fn get_top_50_holders(
     Ok(TokenTopHolders { holders })
 }
 
+
 async fn make_token_overview_message(
     token_data: &TokenOverviewData,
     token_info: &TokenInfo,
     token_price_history: &TokenPriceHistory,
     token_top_holders: &TokenTopHolders,
+    token_audit: &TokenAudit,
 ) -> Result<String, reqwest::Error> {
     //token overview
     let token_address = &token_data.address;
     let name = &token_data.name;
     let symbol = &token_data.symbol;
     let logo_url = &token_data.logo_url;
-    // let creation_date = &token_data.creation_date.clone().unwrap_or_default();
-    // let age = calculate_age(creation_date);
+    let creation_date = &token_data.creation_date.clone().unwrap_or_default();
+    let age = calculate_age(creation_date);
 
     //social info
     // 📊 🫧 🎨 💪 💬 🌍 🐦
@@ -287,7 +312,7 @@ async fn make_token_overview_message(
         //     Some(cap) => cap,
         //     None => 0.0,
         // };
-    let holders_count = token_info.data.holders;
+    let holders_count = &token_info.data.holders;
     let fdv = controll_big_float(token_info.data.fdv);
 
     //top price history
@@ -300,7 +325,7 @@ async fn make_token_overview_message(
     let variation_24h = num_floating_point(&token_price_history.data.variation_24h.unwrap_or_default(), 2);
 
      //top holders Info
-     let holders_count = token_top_holders.holders.len();
+    //  let holders_count = token_top_holders.holders.len();
      let mut sum_usd_amount_top_10_holders = 0.0;
      let mut holders_text = String::from("\n");
      let mut top_num = 0;
@@ -352,6 +377,20 @@ async fn make_token_overview_message(
      }
     let sum_usd_amount_top_10_holders = controll_big_float(sum_usd_amount_top_10_holders);
 
+    //token audit
+    // let is_open_source = &token_audit.data.is_open_source;
+    // let is_honeypot = &token_audit.data.is_honeypot;
+    let is_mintable = &token_audit.data.is_mintable;
+    // let is_proxy = &token_audit.data.is_proxy;
+    // let slippage_modifiable = &token_audit.data.slippage_modifiable;
+    let mut audit_text = String::new();
+    if is_mintable == "yes" {
+        audit_text += &format!("🖨 Mint: ✅");
+    } else if is_mintable == "no" {
+        audit_text += &format!("🖨 Mint: 🔥\n");
+    }
+
+
     let text = format!("
 <a href=\"https://dexscreener.com/apechain/{token_address}\">🚀</a> <a href=\"{logo_url}\">{name}  </a>{symbol}
 🌐 ApeChain @ Camelot
@@ -361,7 +400,7 @@ async fn make_token_overview_message(
         └ <i>1H:</i>    ${price_1h} / {variation_1h}%  
         └ <i>6H:</i>    ${price_6h} / {variation_6h}%  
         └ <i>24H:</i>  ${price_24h} / {variation_24h}% 
-🖨 Mint: ✅ ⋅ LP: 🔥
+{audit_text}🕐 Age:  {age}
 🧰 More: {social_text}
 👩‍👧‍👦 Holders: {holders_count}
         └ Top 10 Holders :  ${sum_usd_amount_top_10_holders}
@@ -392,22 +431,22 @@ fn controll_big_float(num: f64) -> String {
         format!("{:.3}", num)
     }
 }
-// // Add this new function before make_token_overview_message
-// fn calculate_age(creation_date: &str) -> String {
-//     if let Ok(date) = NaiveDateTime::parse_from_str(creation_date, "%Y-%m-%dT%H:%M:%S") {
-//         let creation = DateTime::<Utc>::from_naive_utc_and_offset(date, Utc);
-//         let now = Utc::now();
-//         let duration = now.signed_duration_since(creation);
+// Add this new function before make_token_overview_message
+fn calculate_age(creation_date: &str) -> String {
+    if let Ok(date) = NaiveDateTime::parse_from_str(creation_date, "%Y-%m-%dT%H:%M:%S") {
+        let creation = DateTime::<Utc>::from_naive_utc_and_offset(date, Utc);
+        let now = Utc::now();
+        let duration = now.signed_duration_since(creation);
         
-//         let days = duration.num_days();
-//         if days > 365 {
-//             format!("{:.1} years", days as f64 / 365.0)
-//         } else if days > 30 {
-//             format!("{:.1} months", days as f64 / 30.0)
-//         } else {
-//             format!("{} days", days)
-//         }
-//     } else {
-//         "Unknown".to_string()
-//     }
-// }
+        let days = duration.num_days();
+        if days > 365 {
+            format!("{:.1} years", days as f64 / 365.0)
+        } else if days > 30 {
+            format!("{:.1} months", days as f64 / 30.0)
+        } else {
+            format!("{} days", days)
+        }
+    } else {
+        "🔥".to_string()
+    }
+}
