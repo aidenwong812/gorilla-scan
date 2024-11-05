@@ -3,6 +3,8 @@ pub mod token_info;
 pub mod token_price_history;
 pub mod token_top50_holders;
 pub mod token_audit;
+pub mod token_pool;
+pub mod pool_liquidity;
 
 use tokio::time;
 use dotenv::dotenv;
@@ -20,7 +22,9 @@ use token_overview::{TokenOverviewData, TokenOverview};
 use token_info::TokenInfo;
 use token_price_history::TokenPriceHistory;
 use token_top50_holders::{TokenTopHolders, HolderInfo};
-use token_audit::{TokenAudit, TokenAuditData, Tax};
+use token_audit::TokenAudit;
+use token_pool::TokenPool;
+use pool_liquidity::PoolLiquidity;
 
 #[derive(BotCommands, Clone)]
 #[command(
@@ -106,6 +110,8 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
                 let token_top_holders = get_top_50_holders(request_client.clone(), &debank_api_key, &token_adr).await.unwrap_or_default();
                 tokio::time::sleep(time::Duration::from_secs(1)).await; //delay for 1 sec to avoid conflict request
                 let token_audit = get_token_audit(request_client.clone(), &dextools_api_key, &dextools_api_plan, &token_adr).await.unwrap_or_default();
+                // tokio::time::sleep(time::Duration::from_secs(1)).await; //delay for 1 sec to avoid conflict request
+                // let token_pool = get_token_pool(request_client.clone(), &dextools_api_key, &dextools_api_plan, &token_adr, 0).await.unwrap_or_default();
                 //make message
                 let text =
                     make_token_overview_message(&token_data, &token_info, &token_price_history, &token_top_holders, &token_audit)
@@ -229,7 +235,6 @@ async fn get_top_50_holders(
     Ok(TokenTopHolders { holders })
 }
 
-
 async fn make_token_overview_message(
     token_data: &TokenOverviewData,
     token_info: &TokenInfo,
@@ -246,7 +251,6 @@ async fn make_token_overview_message(
     let age = calculate_age(creation_date);
 
     //social info
-    // 📊 🫧 🎨 💪 💬 🌍 🐦
     let mut social_text = String::new();
     let email = &token_data.social_info.email.clone().unwrap_or_default();
     if !email.is_empty() {
@@ -390,12 +394,33 @@ async fn make_token_overview_message(
         audit_text += &format!("🖨 Mint: 🔥\n");
     }
 
+    //token pool
+    let client = Client::new();
+    let dextools_api_key = env::var("DEXTOOLS_API_KEY").expect("API_KEY not set");
+    let dextools_api_plan = env::var("DEXTOOLS_API_PLAN").expect("API_PLAN not set");
+    let mut page = 0;
+    let mut _liquidity = 0.0;
+    loop {
+        let token_pool_page = get_token_pool(client.clone(), &dextools_api_key, &dextools_api_plan, token_address, page).await.unwrap_or_default();
+        println!("total page: {}\n{}:\t {:?}", token_pool_page.data.total_pages, token_pool_page.data.page, token_pool_page.data.results);
+        for pool in &token_pool_page.data.results {
+            let pool_address = &pool.address;
+            let pool_liquidity = get_pool_liquidity(client.clone(), &dextools_api_key, &dextools_api_plan, pool_address).await.unwrap_or_default();
+            _liquidity += pool_liquidity.data.liquidity.unwrap_or_default();
+        }
+        if token_pool_page.data.page == token_pool_page.data.total_pages {
+            break;
+        }
+        page += 1;
+    }
+    let liquidity = controll_big_float(_liquidity);
 
     let text = format!("
 <a href=\"https://dexscreener.com/apechain/{token_address}\">🚀</a> <a href=\"{logo_url}\">{name}  </a>{symbol}
 🌐 ApeChain @ Camelot
 💰 USD:  ${price}
 💎 FDV:  ${fdv}
+💦 Liquidity:  ${liquidity}
 📈 Price history
         └ <i>1H:</i>    ${price_1h} / {variation_1h}%  
         └ <i>6H:</i>    ${price_6h} / {variation_6h}%  
@@ -448,5 +473,43 @@ fn calculate_age(creation_date: &str) -> String {
         }
     } else {
         "🔥".to_string()
+    }
+}
+
+async fn get_token_pool(client: Client, api_key: &str, api_plan: &str, token_address: &str, page: i32) -> Result<TokenPool, serde_json::Error> {
+    let url = format!(
+        "https://public-api.dextools.io/{}/v2/token/{}/{}/pools?sort=creationTime&order=desc&from=2023-10-01T00%3A00%3A00.000Z&to=2024-11-05T00%3A00%3A00.000Z&pageSize=50&page={}",
+        api_plan, "apechain", token_address, page
+    );
+    let response = client
+    .get(&url)
+    .header("X-API-KEY", api_key)
+    .send()
+    .await
+    .unwrap();
+
+    let text = response.text().await.unwrap();
+    match serde_json::from_str(&text) {
+        Ok(obj) => Ok(obj),
+        Err(e) => Err(e),
+    }
+}
+
+async fn get_pool_liquidity(client: Client, api_key: &str, api_plan: &str, pool_address: &str) -> Result<PoolLiquidity, serde_json::Error> {
+    let url = format!(
+        "https://public-api.dextools.io/{}/v2/pool/{}/{}/liquidity",
+        api_plan, "apechain", pool_address
+    );
+    let response = client
+    .get(&url)
+    .header("X-API-KEY", api_key)
+    .send()
+    .await
+    .unwrap();
+
+    let text = response.text().await.unwrap();
+    match serde_json::from_str(&text) {
+        Ok(obj) => Ok(obj),
+        Err(e) =>  Err(e),
     }
 }
