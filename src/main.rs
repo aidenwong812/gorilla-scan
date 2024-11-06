@@ -339,7 +339,8 @@ async fn make_token_overview_message(
      let mut num_bigfish = 0;
      let mut num_smallfish = 0;
      let mut num_shrimp = 0;
- 
+    
+     holders_text += &format!("<u><b><i>50 Top Holders Map</i></b></u>\n        ");
      for holder in &token_top_holders.holders {
          let holder_address = &holder.holder_address;
          let usd_amount = holder.usd_amount;
@@ -368,7 +369,7 @@ async fn make_token_overview_message(
  
          let link = format!("<a href=\"https://suiscan.xyz/mainnet/account/{holder_address}?Amount={usd_amount}\">{whale_symbol}</a>");
          if index_on_a_line == 9 {
-             holders_text = holders_text + &link + "\n";
+             holders_text = holders_text + &link + "\n        ";
              index_on_a_line = 0;
          } else {
              holders_text = holders_text + &link;
@@ -376,7 +377,7 @@ async fn make_token_overview_message(
          }
  
          if top_num == token_top_holders.holders.len() {
-             holders_text += &format!("\n🐳 ( > $100K ) :  {num_whale}\n🦈 ( $50K - $100K ) :  {num_largefish}\n🐬 ( $10K - $50K ) :  {num_bigfish}\n🐟 ( $1K - $10K ) :  {num_smallfish}\n🦐 ( $0 - $1K ) :  {num_shrimp}\n");
+             holders_text += &format!("\n        🐳 ( > $100K ) :  {num_whale}\n        🦈 ( $50K - $100K ) :  {num_largefish}\n        🐬 ( $10K - $50K ) :  {num_bigfish}\n        🐟 ( $1K - $10K ) :  {num_smallfish}\n        🦐 ( $0 - $1K ) :  {num_shrimp}\n");
          }
      }
     let sum_usd_amount_top_10_holders = controll_big_float(sum_usd_amount_top_10_holders);
@@ -390,54 +391,60 @@ async fn make_token_overview_message(
     let is_blacklisted = &token_audit.data.is_blacklisted;
     let is_contract_renounced = &token_audit.data.is_contract_renounced;
     let is_potentially_scam = &token_audit.data.is_potentially_scam;
-    let sell_tax_min = &token_audit.data.sell_tax.min;
-    let sell_tax_max = &token_audit.data.sell_tax.max;
-    let buy_tax_min = &token_audit.data.buy_tax.min;
-    let buy_tax_max = &token_audit.data.buy_tax.max;
-    let updated_at = &token_audit.data.updated_at;
+    // let sell_tax_min = &token_audit.data.sell_tax.min;
+    // let sell_tax_max = &token_audit.data.sell_tax.max;
+    // let buy_tax_min = &token_audit.data.buy_tax.min;
+    // let buy_tax_max = &token_audit.data.buy_tax.max;
 
     let mut audit_text = String::new();
+    audit_text += &format!("🔍 Audit\n");
     if is_open_source    == "yes" {
-        audit_text += &format!("🖨 Open source: ✅");
+        audit_text += &format!("        🔓 Open source: ✅\n");
     } else if is_open_source == "no" {
-        audit_text += &format!("🖨 Open source: ❌\n");
+        audit_text += &format!("        🔓 Open source: 🔥\n");
     }
     if is_honeypot == "yes" {
-        audit_text += &format!("🔥 Honeypot: ✅\n");
+        audit_text += &format!("        🍯 Honeypot: ✅\n");
     } else if is_honeypot == "no" {
-        audit_text += &format!("🔥 Honeypot: ❌\n");
+        audit_text += &format!("        🍯 Honeypot: 🔥\n");
     }
     if is_mintable == "yes" {  
-        audit_text += &format!("🖨 Mintable: ✅\n");
+        audit_text += &format!("        🖨 Mintable: ✅\n");
     } else if is_mintable == "no" {
-        audit_text += &format!("🖨 Mintable: ❌\n");
+        audit_text += &format!("        🖨 Mintable: 🔥\n");
     }   
     if is_proxy == "yes" {
-        audit_text += &format!("🔥 Proxy: ✅\n");
+        audit_text += &format!("        🔄 Proxy: ✅\n");
     } else if is_proxy == "no" {
-        audit_text += &format!("🔥 Proxy: ❌\n");
+        audit_text += &format!("        🔄 Proxy: 🔥\n");
     }   
     if slippage_modifiable == "yes" {
-        audit_text += &format!("🔥 Slippage modifiable: ✅\n");
+        audit_text += &format!("        📊 Slippage modifiable: ✅\n");
     } else if slippage_modifiable == "no" {
-        audit_text += &format!("🔥 Slippage modifiable: ❌\n");
+        audit_text += &format!("        📊 Slippage modifiable: 🔥\n");
     }   
     if is_blacklisted == "yes" {
-        audit_text += &format!("🔥 Blacklisted: ✅\n");
+        audit_text += &format!("        ⛔ Blacklisted: ✅\n");
     } else if is_blacklisted == "no" {
-        audit_text += &format!("🔥 Blacklisted: ❌\n");
+        audit_text += &format!("        ⛔ Blacklisted: 🔥\n");
     }
     if is_contract_renounced == "yes" {
-        audit_text += &format!("🔥 Contract renounced: ✅\n");
+        audit_text += &format!("        📜 Contract renounced: ✅\n");
     } else if is_contract_renounced == "no" {
-        audit_text += &format!("🔥 Contract renounced: ❌\n");
+        audit_text += &format!("        📜 Contract renounced: 🔥\n");
     }
     if is_potentially_scam == "yes" {
-        audit_text += &format!("🔥 Potentially scam: ✅\n");
+        audit_text += &format!("        ⚠️ Potentially scam: ✅\n");
     } else if is_potentially_scam == "no" {
-        audit_text += &format!("🔥 Potentially scam: ❌\n");
+        audit_text += &format!("        ⚠️ Potentially scam: 🔥\n");
     }
-    audit_text += &format!("⬇️ Sell tax: {sell_tax_min} - {sell_tax_max}\n⬆️ Buy tax: {buy_tax_min} - {buy_tax_max}\n🕐 Updated at: {updated_at}\n");
+    // if *sell_tax_min != 0.0 || *sell_tax_max != 0.0 {
+    //     audit_text += &format!("        ⬇️ Sell tax: {sell_tax_min} - {sell_tax_max}\n");
+    // }
+    // if *buy_tax_min != 0.0 || *buy_tax_max != 0.0 {
+    //     audit_text += &format!("        ⬆️ Buy tax: {buy_tax_min} - {buy_tax_max}\n");
+    // }
+   
 
     //token pool
     let client = Client::new();
