@@ -35,8 +35,8 @@ pub struct TokenAuditData {
 
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]    
 pub struct Tax {
-    pub min: u32,
-    pub max: u32,
+    pub min: f64,
+    pub max: f64,
     pub status: String,
 }
 

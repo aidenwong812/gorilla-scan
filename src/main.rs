@@ -71,15 +71,39 @@ async fn message_handler(bot: Bot, msg: Message, me: Me) -> ResponseResult<()> {
             .await?;
     } else if let Some(text) = msg.text() {
         if let Ok(cmd) = Command::parse(text, me.username()) {
-            answer(bot, msg, cmd).await?;
+            let chat_type = match msg.chat.kind {
+                teloxide::types::ChatKind::Private { .. } => {
+                    "a private chat".to_string()
+                }
+                teloxide::types::ChatKind::Public(ref public_chat) => {
+                    match public_chat.kind {
+                        teloxide::types::PublicChatKind::Group { .. } => "a group".to_string(),
+                        teloxide::types::PublicChatKind::Supergroup { .. } => "a supergroup".to_string(),
+                        teloxide::types::PublicChatKind::Channel { .. } => "a channel".to_string(),
+                    }
+                }
+            };
+
+            if chat_type == "a group" || chat_type == "a supergroup" {
+                let username = msg.from()
+                                    .and_then(|user| user.username.clone())
+                                    .unwrap_or_else(|| {
+                                        msg.from()
+                                            .map(|user| user.first_name.clone())
+                                            .unwrap_or_else(|| "Unknown User".to_string())
+                                    });
+                answer(bot, msg, cmd, username).await?;
+            } else {
+                bot.send_message(msg.chat.id, "This command is not available in this chat type.")
+                    .await?;
+            }
         }
     }
 
     Ok(())
 }
 
-async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
-    let username = msg.chat.username().unwrap();
+async fn answer(bot: Bot, msg: Message, cmd: Command, username: String) -> ResponseResult<()> {
     let message_text = msg.text().unwrap();
 
     match cmd {
@@ -88,7 +112,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
                 .await?;
         }
         Command::Start => {
-            bot.send_message(msg.chat.id, format!("Welcome to Here {username}! 🎉"))
+            bot.send_message(msg.chat.id, format!("Welcome to Here @{username}! 🎉"))
                 .await?;
         }
         Command::S => {
@@ -339,7 +363,8 @@ async fn make_token_overview_message(
      let mut num_bigfish = 0;
      let mut num_smallfish = 0;
      let mut num_shrimp = 0;
- 
+    
+     holders_text += &format!("<u><b><i>50 Top Holders Map</i></b></u>\n        ");
      for holder in &token_top_holders.holders {
          let holder_address = &holder.holder_address;
          let usd_amount = holder.usd_amount;
@@ -368,7 +393,7 @@ async fn make_token_overview_message(
  
          let link = format!("<a href=\"https://suiscan.xyz/mainnet/account/{holder_address}?Amount={usd_amount}\">{whale_symbol}</a>");
          if index_on_a_line == 9 {
-             holders_text = holders_text + &link + "\n";
+             holders_text = holders_text + &link + "\n        ";
              index_on_a_line = 0;
          } else {
              holders_text = holders_text + &link;
@@ -376,23 +401,74 @@ async fn make_token_overview_message(
          }
  
          if top_num == token_top_holders.holders.len() {
-             holders_text += &format!("\n🐳 ( > $100K ) :  {num_whale}\n🦈 ( $50K - $100K ) :  {num_largefish}\n🐬 ( $10K - $50K ) :  {num_bigfish}\n🐟 ( $1K - $10K ) :  {num_smallfish}\n🦐 ( $0 - $1K ) :  {num_shrimp}\n");
+             holders_text += &format!("\n        🐳 ( > $100K ) :  {num_whale}\n        🦈 ( $50K - $100K ) :  {num_largefish}\n        🐬 ( $10K - $50K ) :  {num_bigfish}\n        🐟 ( $1K - $10K ) :  {num_smallfish}\n        🦐 ( $0 - $1K ) :  {num_shrimp}\n");
          }
      }
     let sum_usd_amount_top_10_holders = controll_big_float(sum_usd_amount_top_10_holders);
 
     //token audit
-    // let is_open_source = &token_audit.data.is_open_source;
-    // let is_honeypot = &token_audit.data.is_honeypot;
+    let is_open_source = &token_audit.data.is_open_source;
+    let is_honeypot = &token_audit.data.is_honeypot;
     let is_mintable = &token_audit.data.is_mintable;
-    // let is_proxy = &token_audit.data.is_proxy;
-    // let slippage_modifiable = &token_audit.data.slippage_modifiable;
+    let is_proxy = &token_audit.data.is_proxy;
+    let slippage_modifiable = &token_audit.data.slippage_modifiable;
+    let is_blacklisted = &token_audit.data.is_blacklisted;
+    let is_contract_renounced = &token_audit.data.is_contract_renounced;
+    let is_potentially_scam = &token_audit.data.is_potentially_scam;
+    // let sell_tax_min = &token_audit.data.sell_tax.min;
+    // let sell_tax_max = &token_audit.data.sell_tax.max;
+    // let buy_tax_min = &token_audit.data.buy_tax.min;
+    // let buy_tax_max = &token_audit.data.buy_tax.max;
+
     let mut audit_text = String::new();
-    if is_mintable == "yes" {
-        audit_text += &format!("🖨 Mint: ✅");
-    } else if is_mintable == "no" {
-        audit_text += &format!("🖨 Mint: 🔥\n");
+    audit_text += &format!("🔍 Audit\n");
+    if is_open_source    == "yes" {
+        audit_text += &format!("        🔓 Open source: ✅\n");
+    } else if is_open_source == "no" {
+        audit_text += &format!("        🔓 Open source: 🔥\n");
     }
+    if is_honeypot == "yes" {
+        audit_text += &format!("        🍯 Honeypot: ✅\n");
+    } else if is_honeypot == "no" {
+        audit_text += &format!("        🍯 Honeypot: 🔥\n");
+    }
+    if is_mintable == "yes" {  
+        audit_text += &format!("        🖨 Mintable: ✅\n");
+    } else if is_mintable == "no" {
+        audit_text += &format!("        🖨 Mintable: 🔥\n");
+    }   
+    if is_proxy == "yes" {
+        audit_text += &format!("        🔄 Proxy: ✅\n");
+    } else if is_proxy == "no" {
+        audit_text += &format!("        🔄 Proxy: 🔥\n");
+    }   
+    if slippage_modifiable == "yes" {
+        audit_text += &format!("        📊 Slippage modifiable: ✅\n");
+    } else if slippage_modifiable == "no" {
+        audit_text += &format!("        📊 Slippage modifiable: 🔥\n");
+    }   
+    if is_blacklisted == "yes" {
+        audit_text += &format!("        ⛔ Blacklisted: ✅\n");
+    } else if is_blacklisted == "no" {
+        audit_text += &format!("        ⛔ Blacklisted: 🔥\n");
+    }
+    if is_contract_renounced == "yes" {
+        audit_text += &format!("        📜 Contract renounced: ✅\n");
+    } else if is_contract_renounced == "no" {
+        audit_text += &format!("        📜 Contract renounced: 🔥\n");
+    }
+    if is_potentially_scam == "yes" {
+        audit_text += &format!("        ⚠️ Potentially scam: ✅\n");
+    } else if is_potentially_scam == "no" {
+        audit_text += &format!("        ⚠️ Potentially scam: 🔥\n");
+    }
+    // if *sell_tax_min != 0.0 || *sell_tax_max != 0.0 {
+    //     audit_text += &format!("        ⬇️ Sell tax: {sell_tax_min} - {sell_tax_max}\n");
+    // }
+    // if *buy_tax_min != 0.0 || *buy_tax_max != 0.0 {
+    //     audit_text += &format!("        ⬆️ Buy tax: {buy_tax_min} - {buy_tax_max}\n");
+    // }
+   
 
     //token pool
     let client = Client::new();
