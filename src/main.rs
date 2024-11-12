@@ -126,7 +126,7 @@ async fn answer_command(bot: Bot, msg: Message, cmd: Command, username: String) 
 
 async fn answer_message(bot: Bot, msg: Message) -> ResponseResult<()> {
     let token_adr = msg.text().unwrap();
-    if token_adr.starts_with("0x") || token_adr.len() == 42 || token_adr[2..].chars().all(|c| c.is_ascii_hexdigit()) {
+    if token_adr.starts_with("0x") && token_adr.len() == 42 && token_adr[2..].chars().all(|c| c.is_ascii_hexdigit()) {
                 
         let request_client = Client::new();
         let dextools_api_key = env::var("DEXTOOLS_API_KEY").expect("API_KEY not set");
