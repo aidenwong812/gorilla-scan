@@ -71,15 +71,39 @@ async fn message_handler(bot: Bot, msg: Message, me: Me) -> ResponseResult<()> {
             .await?;
     } else if let Some(text) = msg.text() {
         if let Ok(cmd) = Command::parse(text, me.username()) {
-            answer(bot, msg, cmd).await?;
+            let chat_type = match msg.chat.kind {
+                teloxide::types::ChatKind::Private { .. } => {
+                    "a private chat".to_string()
+                }
+                teloxide::types::ChatKind::Public(ref public_chat) => {
+                    match public_chat.kind {
+                        teloxide::types::PublicChatKind::Group { .. } => "a group".to_string(),
+                        teloxide::types::PublicChatKind::Supergroup { .. } => "a supergroup".to_string(),
+                        teloxide::types::PublicChatKind::Channel { .. } => "a channel".to_string(),
+                    }
+                }
+            };
+
+            if chat_type == "a group" || chat_type == "a supergroup" {
+                let username = msg.from()
+                                    .and_then(|user| user.username.clone())
+                                    .unwrap_or_else(|| {
+                                        msg.from()
+                                            .map(|user| user.first_name.clone())
+                                            .unwrap_or_else(|| "Unknown User".to_string())
+                                    });
+                answer(bot, msg, cmd, username).await?;
+            } else {
+                bot.send_message(msg.chat.id, "This command is not available in this chat type.")
+                    .await?;
+            }
         }
     }
 
     Ok(())
 }
 
-async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
-    let username = msg.chat.username().unwrap();
+async fn answer(bot: Bot, msg: Message, cmd: Command, username: String) -> ResponseResult<()> {
     let message_text = msg.text().unwrap();
 
     match cmd {
@@ -88,7 +112,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
                 .await?;
         }
         Command::Start => {
-            bot.send_message(msg.chat.id, format!("Welcome to Here {username}! 🎉"))
+            bot.send_message(msg.chat.id, format!("Welcome to Here @{username}! 🎉"))
                 .await?;
         }
         Command::S => {
