@@ -125,20 +125,16 @@ async fn answer_command(bot: Bot, msg: Message, cmd: Command, username: String) 
 }
 
 async fn answer_message(bot: Bot, msg: Message) -> ResponseResult<()> {
-           let token_adr = msg.text().unwrap();
-            if !token_adr.starts_with("0x") || token_adr.len() != 42 || !token_adr[2..].chars().all(|c| c.is_ascii_hexdigit()) {
-                bot.send_message(msg.chat.id, "Invalid token address format. Address should start with '0x' followed by 40 hexadecimal characters.")
-                    .await?;
-                return Ok(());
-            }
-            
-            let request_client = Client::new();
-            let dextools_api_key = env::var("DEXTOOLS_API_KEY").expect("API_KEY not set");
-            let dextools_api_plan = env::var("DEXTOOLS_API_PLAN").expect("API_PLAN not set");
-            let debank_api_key = env::var("DEBANK_API_KEY").expect("API_KEY not set");
-
-            match get_token_data(request_client.clone(), &dextools_api_key, &dextools_api_plan, &token_adr).await {
-                Ok(token_data) => {
+    let token_adr = msg.text().unwrap();
+    if token_adr.starts_with("0x") || token_adr.len() == 42 || token_adr[2..].chars().all(|c| c.is_ascii_hexdigit()) {
+                
+        let request_client = Client::new();
+        let dextools_api_key = env::var("DEXTOOLS_API_KEY").expect("API_KEY not set");
+        let dextools_api_plan = env::var("DEXTOOLS_API_PLAN").expect("API_PLAN not set");
+        let debank_api_key = env::var("DEBANK_API_KEY").expect("API_KEY not set");
+        
+        match get_token_data(request_client.clone(), &dextools_api_key, &dextools_api_plan, &token_adr).await {
+            Ok(token_data) => {
                 tokio::time::sleep(time::Duration::from_secs(1)).await; //delay for 1 sec to avoid conflict request
                 let token_info = get_token_info(request_client.clone(), &dextools_api_key, &dextools_api_plan, &token_adr).await.unwrap_or_default();
                 tokio::time::sleep(time::Duration::from_secs(1)).await; //delay for 1 sec to avoid conflict request
@@ -151,18 +147,19 @@ async fn answer_message(bot: Bot, msg: Message) -> ResponseResult<()> {
                 // let token_pool = get_token_pool(request_client.clone(), &dextools_api_key, &dextools_api_plan, &token_adr, 0).await.unwrap_or_default();
                 //make message
                 let text =
-                    make_token_overview_message(&token_data, &token_info, &token_price_history, &token_top_holders, &token_audit)
+                make_token_overview_message(&token_data, &token_info, &token_price_history, &token_top_holders, &token_audit)
                         .await?;
-                    bot.send_message(msg.chat.id, text)  // Changed "text" to text
+                bot.send_message(msg.chat.id, text)  // Changed "text" to text
                         .parse_mode(teloxide::types::ParseMode::Html)
                         .await?;
-                }
-                Err(e) => {
-                    error!("Error fetching token overview: {}", e);
-                    bot.send_message(msg.chat.id, "Invalid token address")
-                        .await?;
-                }
             }
+            Err(e) => {
+                error!("Error fetching token overview: {}", e);
+                bot.send_message(msg.chat.id, "Invalid token address")
+                .await?;
+            }
+        }
+    }
     Ok(())
 }
 
