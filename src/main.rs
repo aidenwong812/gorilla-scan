@@ -126,7 +126,6 @@ async fn answer_command(bot: Bot, msg: Message, cmd: Command, username: String) 
 
 async fn answer_message(bot: Bot, msg: Message) -> ResponseResult<()> {
            let token_adr = msg.text().unwrap();
-            info!("Received command /s for token: {}", token_adr);
             if !token_adr.starts_with("0x") || token_adr.len() != 42 || !token_adr[2..].chars().all(|c| c.is_ascii_hexdigit()) {
                 bot.send_message(msg.chat.id, "Invalid token address format. Address should start with '0x' followed by 40 hexadecimal characters.")
                     .await?;
