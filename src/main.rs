@@ -36,8 +36,6 @@ enum Command {
     Help,
     #[command(description = "Send the welcome message")]
     Start,
-    #[command(description = "Get token overview\n\tEntry type: /s ****(token address)")]
-    S,
 }
 
 #[tokio::main]
@@ -70,7 +68,7 @@ async fn message_handler(bot: Bot, msg: Message, me: Me) -> ResponseResult<()> {
         bot.send_message(msg.chat.id, data.web_app_data.data)
             .await?;
     } else if let Some(text) = msg.text() {
-        if let Ok(cmd) = Command::parse(text, me.username()) {
+
             let chat_type = match msg.chat.kind {
                 teloxide::types::ChatKind::Private { .. } => {
                     "a private chat".to_string()
@@ -92,19 +90,22 @@ async fn message_handler(bot: Bot, msg: Message, me: Me) -> ResponseResult<()> {
                                             .map(|user| user.first_name.clone())
                                             .unwrap_or_else(|| "Unknown User".to_string())
                                     });
-                answer(bot, msg, cmd, username).await?;
+                if let Ok(cmd) = Command::parse(text, me.username()) {
+                    answer_command(bot, msg, cmd, username).await?;
+                } else {
+                    answer_message(bot, msg).await?;
+                }
             } else {
-                bot.send_message(msg.chat.id, "This command is not available in this chat type.")
+                bot.send_message(msg.chat.id, "This message is not available in this chat type. Please try again in group chat.")
                     .await?;
-            }
         }
+        
     }
 
     Ok(())
 }
 
-async fn answer(bot: Bot, msg: Message, cmd: Command, username: String) -> ResponseResult<()> {
-    let message_text = msg.text().unwrap();
+async fn answer_command(bot: Bot, msg: Message, cmd: Command, username: String) -> ResponseResult<()> {
 
     match cmd {
         Command::Help => {
@@ -115,9 +116,22 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, username: String) -> Respo
             bot.send_message(msg.chat.id, format!("Welcome to Here @{username}! 🎉"))
                 .await?;
         }
-        Command::S => {
-            let token_adr = message_text.replace("/s ", "");
+        _ => {
+            bot.send_message(msg.chat.id, "Invalid command")
+                .await?;
+        }
+    }
+    Ok(())
+}
+
+async fn answer_message(bot: Bot, msg: Message) -> ResponseResult<()> {
+           let token_adr = msg.text().unwrap();
             info!("Received command /s for token: {}", token_adr);
+            if !token_adr.starts_with("0x") || token_adr.len() != 42 || !token_adr[2..].chars().all(|c| c.is_ascii_hexdigit()) {
+                bot.send_message(msg.chat.id, "Invalid token address format. Address should start with '0x' followed by 40 hexadecimal characters.")
+                    .await?;
+                return Ok(());
+            }
             
             let request_client = Client::new();
             let dextools_api_key = env::var("DEXTOOLS_API_KEY").expect("API_KEY not set");
@@ -149,9 +163,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command, username: String) -> Respo
                     bot.send_message(msg.chat.id, "Invalid token address")
                         .await?;
                 }
-            };
-        }
-    }
+            }
     Ok(())
 }
 
