@@ -1,14 +1,11 @@
-pub mod token_overview;
 pub mod token_info;
 pub mod token_price_history;
-pub mod token_top50_holders;
+pub mod token_holders;
 pub mod token_audit;
-pub mod token_pool;
-pub mod pool_liquidity;
+pub mod native_token;
 
-use tokio::time;
 use dotenv::dotenv;
-use log::{error, info};
+use log::error;
 use reqwest::Client;
 use serde_json;
 use std::env;
@@ -17,14 +14,12 @@ use teloxide::{
     types::{Me, MessageKind},
     utils::command::BotCommands,
 };
-use chrono::{NaiveDateTime, DateTime, Utc};
-use token_overview::{TokenOverviewData, TokenOverview};
-use token_info::TokenInfo;
-use token_price_history::TokenPriceHistory;
-use token_top50_holders::{TokenTopHolders, HolderInfo};
-use token_audit::TokenAudit;
-use token_pool::TokenPool;
-use pool_liquidity::PoolLiquidity;
+use chrono::{DateTime, Utc};
+use token_info::*;
+use token_price_history::*;
+use token_holders::*;
+use token_audit::*;
+use native_token::*;
 
 #[derive(BotCommands, Clone)]
 #[command(
@@ -131,17 +126,15 @@ async fn answer_message(bot: Bot, msg: Message) -> ResponseResult<()> {
         let request_client = Client::new();
         let dextools_api_key = env::var("DEXTOOLS_API_KEY").expect("API_KEY not set");
         let dextools_api_plan = env::var("DEXTOOLS_API_PLAN").expect("API_PLAN not set");
-        let debank_api_key = env::var("DEBANK_API_KEY").expect("API_KEY not set");
         
-        match get_token_data(request_client.clone(), &dextools_api_key, &dextools_api_plan, &token_adr).await {
-            Ok(token_data) => {
-                let token_info = get_token_info(request_client.clone(), &dextools_api_key, &dextools_api_plan, &token_adr).await.unwrap_or_default();
+        match get_token_info(request_client.clone(), &token_adr).await {
+            Ok(token_info) => {
                 let token_price_history = get_token_price_history(request_client.clone(), &dextools_api_key, &dextools_api_plan, &token_adr).await.unwrap_or_default();
-                let token_top_holders = get_top_50_holders(request_client.clone(), &debank_api_key, &token_adr).await.unwrap_or_default();
+                let token_holders = get_holders(request_client.clone(), &token_adr).await.unwrap_or_default();
                 let token_audit = get_token_audit(request_client.clone(), &dextools_api_key, &dextools_api_plan, &token_adr).await.unwrap_or_default();
                 //make message
                 let text =
-                make_token_overview_message(&token_data, &token_info, &token_price_history, &token_top_holders, &token_audit)
+                make_token_overview_message(&token_info, &token_price_history, &token_holders, &token_audit)
                         .await?;
                 bot.send_message(msg.chat.id, text)  // Changed "text" to text
                         .parse_mode(teloxide::types::ParseMode::Html)
@@ -158,39 +151,19 @@ async fn answer_message(bot: Bot, msg: Message) -> ResponseResult<()> {
 }
 
 
-async fn get_token_data(client: Client, api_key: &str, api_plan: &str, token_address: &str) -> Result<TokenOverviewData, serde_json::Error> {
+async fn get_token_info(client: Client, token_address: &str) -> Result<TokenInfo, serde_json::Error> {
     let url = format!(
-        "https://public-api.dextools.io/{}/v2/token/{}/{}",
-        api_plan, "apechain", token_address
-    );
-
-    let response = client
-        .get(&url)
-        .header("X-API-KEY", api_key)
-        .send()
-        .await
-        .unwrap();
-
-    let text = response.text().await.unwrap();
-    match serde_json::from_str::<TokenOverview>(&text) {
-        Ok(token_overview) => Ok(token_overview.data),
-        Err(e) => Err(e),
-    }
-}
-
-async fn get_token_info(client: Client, api_key: &str, api_plan: &str, token_address: &str) -> Result<TokenInfo, serde_json::Error> {
-    let url = format!(
-        "https://public-api.dextools.io/{}/v2/token/{}/{}/info",
-        api_plan, "apechain", token_address
+        "https://ape.express/api/tokens/{}",
+        token_address
     );
 
     let response = client
     .get(&url)
-    .header("X-API-KEY", api_key)
     .send()
     .await
     .unwrap();
 
+    
     let text = response.text().await.unwrap();
     match serde_json::from_str(&text) {
         Ok(obj) => Ok(obj),
@@ -237,116 +210,88 @@ async fn get_token_audit(client: Client, api_key: &str, api_plan: &str, token_ad
     }
 }
 
-async fn get_top_50_holders(
+async fn get_holders(
     client: Client,
-    api_key: &str,
     token_address: &str,
 ) -> Result<TokenTopHolders, serde_json::Error> {
     let url = format!(
-        "https://pro-openapi.debank.com/v1/token/top_holders?chain_id={}&id={}&start=0&limit=50",
-        "ape",
+        "https://ape.express/api/tokens/{}/holders",
         token_address
     );
     
     let response = client
         .get(&url)
-        .header("AccessKey", api_key)
         .send()
         .await
         .unwrap();
 
     let text = response.text().await.unwrap();
     
-    let holders: Vec<HolderInfo> = serde_json::from_str(&text)?;
-    Ok(TokenTopHolders { holders })
+    let holders:TokenTopHolders = serde_json::from_str(&text).unwrap_or_default();
+    Ok(holders)
 }
 
 async fn make_token_overview_message(
-    token_data: &TokenOverviewData,
     token_info: &TokenInfo,
     token_price_history: &TokenPriceHistory,
     token_top_holders: &TokenTopHolders,
     token_audit: &TokenAudit,
 ) -> Result<String, reqwest::Error> {
-    //token overview
-    let token_address = &token_data.address;
-    let name = &token_data.name;
-    let symbol = &token_data.symbol;
-    let logo_url = &token_data.logo_url;
-    let creation_date = &token_data.creation_date.clone().unwrap_or_default();
-    let age = calculate_age(creation_date);
+
+    let token_decimal = 18;
+    
+    // Get native token price
+    let native_token_price = match get_native_token_price().await {
+        Ok(token) => token.price.parse::<f64>().unwrap_or_default() / 10_f64.powi(8),
+        Err(_) => 0.0,
+    };
+
+    // Extract token info with proper error handling
+    let token_address = &token_info.address;
+    let token_launch_at = &token_info.launch_at;
+    let token_name = &token_info.name;
+    let token_symbol = &token_info.symbol;
+    let token_total_supply = token_info.total_supply.parse::<f64>().unwrap_or_default() / 10_f64.powi(token_decimal as i32); 
+    // let token_block_timestamp = &token_info.block_timestamp;
+    let token_price = num_floating_point(&(token_info.price.parse::<f64>().unwrap_or_default() * native_token_price), 5);
+    let token_liquidity = token_info.liquidity.clone().unwrap_or_default();
+    let liquidity = controll_big_float(token_liquidity.native_reserve.parse::<f64>().unwrap_or_default() / 10_f64.powi(token_decimal as i32) * native_token_price * 2.0);
+    
+    let market_cap = controll_big_float(token_total_supply * token_price);
+    let age = if let Some(launch_time) = token_launch_at {
+        calculate_age(launch_time)
+    } else {
+        "🔥".to_string()
+    };
+
 
     //social info
     let mut social_text = String::new();
-    let email = &token_data.social_info.email.clone().unwrap_or_default();
-    if !email.is_empty() {
-        social_text += &format!(" <a href=\"{email}\">📧 </a>");
+    if let Some(details) = &token_info.details {
+        if let Some(discord) = &details.discord {
+            if !discord.is_empty() {
+                social_text += &format!(" <a href=\"{discord}\">💭 </a>");
+            }
+        }
+        if let Some(telegram) = &details.telegram {
+            if !telegram.is_empty() {
+                social_text += &format!(" <a href=\"{telegram}\">🕊️ </a>");
+            }
+        }
+        if let Some(twitter) = &details.twitter {
+            if !twitter.is_empty() {
+                social_text += &format!(" <a href=\"{twitter}\">𝕏 </a>");
+            }
+        }
+        if let Some(website) = &details.website {
+            if !website.is_empty() {
+                social_text += &format!(" <a href=\"{website}\">🌐 </a>");
+            }
+        }
     }
-    let bitbucket = &token_data.social_info.bitbucket.clone().unwrap_or_default();
-    if !bitbucket.is_empty() {
-        social_text += &format!(" <a href=\"{bitbucket}\">🗃️ </a>");
-    }
-    let discord = &token_data.social_info.discord.clone().unwrap_or_default();
-    if !discord.is_empty() {
-        social_text += &format!(" <a href=\"{discord}\">💭 </a>");
-    }
-    let facebook = &token_data.social_info.facebook.clone().unwrap_or_default();
-    if !facebook.is_empty() {
-        social_text += &format!(" <a href=\"{facebook}\">ⓕ </a>");
-    }
-    let github = &token_data.social_info.github.clone().unwrap_or_default();
-    if !github.is_empty() {
-        social_text += &format!(" <a href=\"{github}\">🐱 </a>");
-    }
-    let instagram = &token_data.social_info.instagram.clone().unwrap_or_default();
-    if !instagram.is_empty() {
-        social_text += &format!(" <a href=\"{instagram}\">📸 </a>");
-    }
-    let linkedin = &token_data.social_info.linkedin.clone().unwrap_or_default();
-    if !linkedin.is_empty() {
-        social_text += &format!(" <a href=\"{linkedin}\">ℹ️ </a>");
-    }
-    let medium = &token_data.social_info.medium.clone().unwrap_or_default();
-    if !medium.is_empty() {
-        social_text += &format!(" <a href=\"{medium}\">Ⓜ️ </a>");
-    }
-    let reddit = &token_data.social_info.reddit.clone().unwrap_or_default();
-    if !reddit.is_empty() {
-        social_text += &format!(" <a href=\"{reddit}\">🎯</a>");
-    }
-    let telegram = &token_data.social_info.telegram.clone().unwrap_or_default();
-    if !telegram.is_empty() {
-        social_text += &format!(" <a href=\"{telegram}\">🕊️ </a>");
-    }
-    let tiktok = &token_data.social_info.tiktok.clone().unwrap_or_default();
-    if !tiktok.is_empty() {
-        social_text += &format!(" <a href=\"{tiktok}\">🎬 </a>");
-    }
-    let twitter = &token_data.social_info.twitter.clone().unwrap_or_default();
-    if !twitter.is_empty() {
-        social_text += &format!(" <a href=\"{twitter}\">𝕏 </a>");
-    }
-    let website = &token_data.social_info.website.clone().unwrap_or_default();
-    if !website.is_empty() {
-        social_text += &format!(" <a href=\"{website}\">🌐 </a>");
-    }
-    let youtube = &token_data.social_info.youtube.clone().unwrap_or_default();
-    if !youtube.is_empty() {
-        social_text += &format!(" <a href=\"{youtube}\">🎥</a>");
-    }
-
-
-    // # token Info
-    // let total_supply = token_info.data.total_supply;
-    // let mcap = match token_info.data.mcap {
-        //     Some(cap) => cap,
-        //     None => 0.0,
-        // };
-    let holders_count = &token_info.data.holders;
-    let fdv = controll_big_float(token_info.data.fdv);
-
+   
     //top price history
-    let price = num_floating_point(&token_price_history.data.price, 3)  ;
+    // let price = num_floating_point(&token_price_history.data.price, 3)  ;
     let price_1h = num_floating_point(&token_price_history.data.price_1h.unwrap_or_default(), 3);
     let price_6h = num_floating_point(&token_price_history.data.price_6h.unwrap_or_default(), 3);
     let price_24h = num_floating_point(&token_price_history.data.price_24h.unwrap_or_default(), 3);
@@ -354,8 +299,8 @@ async fn make_token_overview_message(
     let variation_6h = num_floating_point(&token_price_history.data.variation_6h.unwrap_or_default(), 2);
     let variation_24h = num_floating_point(&token_price_history.data.variation_24h.unwrap_or_default(), 2);
 
-     //top holders Info
-    //  let holders_count = token_top_holders.holders.len();
+    //top holders Info
+     let holders_count = token_top_holders.total_holders.parse::<u32>().unwrap_or_default();
      let mut sum_usd_amount_top_10_holders = 0.0;
      let mut holders_text = String::from("\n");
      let mut top_num = 0;
@@ -366,10 +311,15 @@ async fn make_token_overview_message(
      let mut num_smallfish = 0;
      let mut num_shrimp = 0;
     
-     holders_text += &format!("<u><b><i>50 Top Holders Map</i></b></u>\n        ");
-     for holder in &token_top_holders.holders {
-         let holder_address = &holder.holder_address;
-         let usd_amount = holder.usd_amount;
+     if holders_count >= 50  {
+        holders_text += &format!("<u><b><i>50 Top Holders Map</i></b></u>\n        ");
+     } else if holders_count > 0{
+        holders_text += &format!("<u><b><i>{holders_count} Top Holders Map</i></b></u>\n        ");
+     }
+     for holder in &token_top_holders.list {
+         let holder_address = &holder.address;
+         let balance = holder.balance.parse::<f64>().unwrap_or_default();
+         let usd_amount = balance / 10_f64.powi(token_decimal as i32) * token_price;
  
          top_num += 1;
          if top_num <= 10 {
@@ -401,9 +351,15 @@ async fn make_token_overview_message(
              holders_text = holders_text + &link;
              index_on_a_line += 1;
          }
- 
-         if top_num == token_top_holders.holders.len() {
-             holders_text += &format!("\n        🐳 ( > $100K ) :  {num_whale}\n        🦈 ( $50K - $100K ) :  {num_largefish}\n        🐬 ( $10K - $50K ) :  {num_bigfish}\n        🐟 ( $1K - $10K ) :  {num_smallfish}\n        🦐 ( $0 - $1K ) :  {num_shrimp}\n");
+         if holders_count <= 50 {
+            if top_num == holders_count {
+                holders_text += &format!("\n        🐳 ( > $100K ) :  {num_whale}\n        🦈 ( $50K - $100K ) :  {num_largefish}\n        🐬 ( $10K - $50K ) :  {num_bigfish}\n        🐟 ( $1K - $10K ) :  {num_smallfish}\n        🦐 ( $0 - $1K ) :  {num_shrimp}\n");
+            }
+         } else {
+            if top_num == 50 {
+                holders_text += &format!("\n        🐳 ( > $100K ) :  {num_whale}\n        🦈 ( $50K - $100K ) :  {num_largefish}\n        🐬 ( $10K - $50K ) :  {num_bigfish}\n        🐟 ( $1K - $10K ) :  {num_smallfish}\n        🦐 ( $0 - $1K ) :  {num_shrimp}\n");
+                break;
+            }
          }
      }
     let sum_usd_amount_top_10_holders = controll_big_float(sum_usd_amount_top_10_holders);
@@ -474,31 +430,12 @@ async fn make_token_overview_message(
         // }
     }
 
-    //token pool
-    let client = Client::new();
-    let dextools_api_key = env::var("DEXTOOLS_API_KEY").expect("API_KEY not set");
-    let dextools_api_plan = env::var("DEXTOOLS_API_PLAN").expect("API_PLAN not set");
-    let mut page = 0;
-    let mut _liquidity = 0.0;
-    loop {
-        let token_pool_page = get_token_pool(client.clone(), &dextools_api_key, &dextools_api_plan, token_address, page).await.unwrap_or_default();
-        for pool in &token_pool_page.data.results {
-            let pool_address = &pool.address;
-            let pool_liquidity = get_pool_liquidity(client.clone(), &dextools_api_key, &dextools_api_plan, pool_address).await.unwrap_or_default();
-            _liquidity += pool_liquidity.data.liquidity.unwrap_or_default();
-        }
-        if token_pool_page.data.page == token_pool_page.data.total_pages {
-            break;
-        }
-        page += 1;
-    }
-    let liquidity = controll_big_float(_liquidity);
-
+ 
     let text = format!("
-<a href=\"https://dexscreener.com/apechain/{token_address}\">🚀</a> <a href=\"{logo_url}\">{name}  </a>{symbol}
+<a href=\"https://dexscreener.com/apechain/{token_address}\">🚀</a> {token_name}  {token_symbol}
 🌐 ApeChain @ Camelot
-💰 USD:  ${price}
-💎 FDV:  ${fdv}
+💰 USD:  ${token_price}
+💎 Mcap:  ${market_cap}
 💦 Liquidity:  ${liquidity}
 📈 Price history
         └ <i>1H:</i>    ${price_1h} / {variation_1h}%  
@@ -535,10 +472,10 @@ fn controll_big_float(num: f64) -> String {
         format!("{:.3}", num)
     }
 }
-// Add this new function before make_token_overview_message
-fn calculate_age(creation_date: &str) -> String {
-    if let Ok(date) = NaiveDateTime::parse_from_str(creation_date, "%Y-%m-%dT%H:%M:%S") {
-        let creation = DateTime::<Utc>::from_naive_utc_and_offset(date, Utc);
+
+fn calculate_age(timestamp: &str) -> String {
+    if let Ok(unix_timestamp) = timestamp.parse::<i64>() {
+        let creation = DateTime::<Utc>::from_timestamp(unix_timestamp, 0).unwrap();
         let now = Utc::now();
         let duration = now.signed_duration_since(creation);
         
@@ -555,40 +492,16 @@ fn calculate_age(creation_date: &str) -> String {
     }
 }
 
-async fn get_token_pool(client: Client, api_key: &str, api_plan: &str, token_address: &str, page: i32) -> Result<TokenPool, serde_json::Error> {
-    let url = format!(
-        "https://public-api.dextools.io/{}/v2/token/{}/{}/pools?sort=creationTime&order=desc&from=2023-10-01T00%3A00%3A00.000Z&to=2024-11-05T00%3A00%3A00.000Z&pageSize=50&page={}",
-        api_plan, "apechain", token_address, page
-    );
-    let response = client
-    .get(&url)
-    .header("X-API-KEY", api_key)
-    .send()
-    .await
-    .unwrap();
+
+async fn get_native_token_price() -> Result<NativeToken, serde_json::Error> {
+    let client = Client::new();
+    let url = "https://ape.express/api/tokens/ape".to_string();
+
+    let response = client.get(&url).send().await.unwrap();
 
     let text = response.text().await.unwrap();
     match serde_json::from_str(&text) {
         Ok(obj) => Ok(obj),
         Err(e) => Err(e),
-    }
-}
-
-async fn get_pool_liquidity(client: Client, api_key: &str, api_plan: &str, pool_address: &str) -> Result<PoolLiquidity, serde_json::Error> {
-    let url = format!(
-        "https://public-api.dextools.io/{}/v2/pool/{}/{}/liquidity",
-        api_plan, "apechain", pool_address
-    );
-    let response = client
-    .get(&url)
-    .header("X-API-KEY", api_key)
-    .send()
-    .await
-    .unwrap();
-
-    let text = response.text().await.unwrap();
-    match serde_json::from_str(&text) {
-        Ok(obj) => Ok(obj),
-        Err(e) =>  Err(e),
     }
 }
