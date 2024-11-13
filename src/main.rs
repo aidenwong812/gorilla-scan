@@ -135,16 +135,15 @@ async fn answer_message(bot: Bot, msg: Message) -> ResponseResult<()> {
         
         match get_token_data(request_client.clone(), &dextools_api_key, &dextools_api_plan, &token_adr).await {
             Ok(token_data) => {
-                tokio::time::sleep(time::Duration::from_secs(1)).await; //delay for 1 sec to avoid conflict request
+                // tokio::time::sleep(time::Duration::from_secs(1)).await; //delay for 1 sec to avoid conflict request
                 let token_info = get_token_info(request_client.clone(), &dextools_api_key, &dextools_api_plan, &token_adr).await.unwrap_or_default();
-                tokio::time::sleep(time::Duration::from_secs(1)).await; //delay for 1 sec to avoid conflict request
+                // tokio::time::sleep(time::Duration::from_secs(1)).await; //delay for 1 sec to avoid conflict request
                 let token_price_history = get_token_price_history(request_client.clone(), &dextools_api_key, &dextools_api_plan, &token_adr).await.unwrap_or_default();
-                tokio::time::sleep(time::Duration::from_secs(1)).await; //delay for 1 sec to avoid conflict request
+                // tokio::time::sleep(time::Duration::from_secs(1)).await; //delay for 1 sec to avoid conflict request
                 let token_top_holders = get_top_50_holders(request_client.clone(), &debank_api_key, &token_adr).await.unwrap_or_default();
-                tokio::time::sleep(time::Duration::from_secs(1)).await; //delay for 1 sec to avoid conflict request
+                // tokio::time::sleep(time::Duration::from_secs(1)).await; //delay for 1 sec to avoid conflict request
                 let token_audit = get_token_audit(request_client.clone(), &dextools_api_key, &dextools_api_plan, &token_adr).await.unwrap_or_default();
                 // tokio::time::sleep(time::Duration::from_secs(1)).await; //delay for 1 sec to avoid conflict request
-                // let token_pool = get_token_pool(request_client.clone(), &dextools_api_key, &dextools_api_plan, &token_adr, 0).await.unwrap_or_default();
                 //make message
                 let text =
                 make_token_overview_message(&token_data, &token_info, &token_price_history, &token_top_holders, &token_audit)
