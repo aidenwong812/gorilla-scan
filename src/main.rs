@@ -415,68 +415,70 @@ async fn make_token_overview_message(
     let sum_usd_amount_top_10_holders = controll_big_float(sum_usd_amount_top_10_holders);
 
     //token audit
-    let is_open_source = &token_audit.data.is_open_source;
-    let is_honeypot = &token_audit.data.is_honeypot;
-    let is_mintable = &token_audit.data.is_mintable;
-    let is_proxy = &token_audit.data.is_proxy;
-    let slippage_modifiable = &token_audit.data.slippage_modifiable;
-    let is_blacklisted = &token_audit.data.is_blacklisted;
-    let is_contract_renounced = &token_audit.data.is_contract_renounced;
-    let is_potentially_scam = &token_audit.data.is_potentially_scam;
-    // let sell_tax_min = &token_audit.data.sell_tax.min;
-    // let sell_tax_max = &token_audit.data.sell_tax.max;
-    // let buy_tax_min = &token_audit.data.buy_tax.min;
-    // let buy_tax_max = &token_audit.data.buy_tax.max;
-
     let mut audit_text = String::new();
-    audit_text += &format!("🔍 Audit\n");
-    if is_open_source    == "yes" {
-        audit_text += &format!("        🔓 Open source: ✅\n");
-    } else if is_open_source == "no" {
-        audit_text += &format!("        🔓 Open source: 🔥\n");
+    let token_audit_status = &token_audit.status_code;
+    if *token_audit_status == 200 {
+        let is_open_source = &token_audit.data.is_open_source;
+        let is_honeypot = &token_audit.data.is_honeypot;
+        let is_mintable = &token_audit.data.is_mintable;
+        let is_proxy = &token_audit.data.is_proxy;
+        let slippage_modifiable = &token_audit.data.slippage_modifiable;
+        let is_blacklisted = &token_audit.data.is_blacklisted;
+        let is_contract_renounced = &token_audit.data.is_contract_renounced;
+        let is_potentially_scam = &token_audit.data.is_potentially_scam;
+        // let sell_tax_min = &token_audit.data.sell_tax.min;
+        // let sell_tax_max = &token_audit.data.sell_tax.max;
+        // let buy_tax_min = &token_audit.data.buy_tax.min;
+        // let buy_tax_max = &token_audit.data.buy_tax.max;
+
+        audit_text += &format!("🔍 Audit\n");
+        if is_open_source    == "yes" {
+            audit_text += &format!("        🔓 Open source: ✅\n");
+        } else if is_open_source == "no" {
+            audit_text += &format!("        🔓 Open source: ❌\n");
+        }
+        if is_honeypot == "yes" {
+            audit_text += &format!("        🍯 Honeypot: ✅\n");
+        } else if is_honeypot == "no" {
+            audit_text += &format!("        🍯 Honeypot: ❌\n");
+        }
+        if is_mintable == "yes" {  
+            audit_text += &format!("        🖨 Mintable: ✅\n");
+        } else if is_mintable == "no" {
+            audit_text += &format!("        🖨 Mintable: ❌\n");
+        }   
+        if is_proxy == "yes" {
+            audit_text += &format!("        🔄 Proxy: ✅\n");
+        } else if is_proxy == "no" {
+            audit_text += &format!("        🔄 Proxy: ❌\n");
+        }   
+        if slippage_modifiable == "yes" {
+            audit_text += &format!("        📊 Slippage modifiable: ✅\n");
+        } else if slippage_modifiable == "no" {
+            audit_text += &format!("        📊 Slippage modifiable: ❌\n");
+        }   
+        if is_blacklisted == "yes" {
+            audit_text += &format!("        ⛔ Blacklisted: ❗\n");
+        } else if is_blacklisted == "no" {
+            audit_text += &format!("        ⛔ Blacklisted: ❌\n");
+        }
+        if is_contract_renounced == "yes" {
+            audit_text += &format!("        📜 Contract renounced: ✅\n");
+        } else if is_contract_renounced == "no" {
+            audit_text += &format!("        📜 Contract renounced: ❌\n");
+        }
+        if is_potentially_scam == "yes" {
+            audit_text += &format!("        ⚠️ Potentially scam: ❗\n");
+        } else if is_potentially_scam == "no" {
+            audit_text += &format!("        ⚠️ Potentially scam: ❌\n");
+        }
+        // if *sell_tax_min != 0.0 || *sell_tax_max != 0.0 {
+        //     audit_text += &format!("        ⬇️ Sell tax: {sell_tax_min} - {sell_tax_max}\n");
+        // }
+        // if *buy_tax_min != 0.0 || *buy_tax_max != 0.0 {
+        //     audit_text += &format!("        ⬆️ Buy tax: {buy_tax_min} - {buy_tax_max}\n");
+        // }
     }
-    if is_honeypot == "yes" {
-        audit_text += &format!("        🍯 Honeypot: ✅\n");
-    } else if is_honeypot == "no" {
-        audit_text += &format!("        🍯 Honeypot: 🔥\n");
-    }
-    if is_mintable == "yes" {  
-        audit_text += &format!("        🖨 Mintable: ✅\n");
-    } else if is_mintable == "no" {
-        audit_text += &format!("        🖨 Mintable: 🔥\n");
-    }   
-    if is_proxy == "yes" {
-        audit_text += &format!("        🔄 Proxy: ✅\n");
-    } else if is_proxy == "no" {
-        audit_text += &format!("        🔄 Proxy: 🔥\n");
-    }   
-    if slippage_modifiable == "yes" {
-        audit_text += &format!("        📊 Slippage modifiable: ✅\n");
-    } else if slippage_modifiable == "no" {
-        audit_text += &format!("        📊 Slippage modifiable: 🔥\n");
-    }   
-    if is_blacklisted == "yes" {
-        audit_text += &format!("        ⛔ Blacklisted: ✅\n");
-    } else if is_blacklisted == "no" {
-        audit_text += &format!("        ⛔ Blacklisted: 🔥\n");
-    }
-    if is_contract_renounced == "yes" {
-        audit_text += &format!("        📜 Contract renounced: ✅\n");
-    } else if is_contract_renounced == "no" {
-        audit_text += &format!("        📜 Contract renounced: 🔥\n");
-    }
-    if is_potentially_scam == "yes" {
-        audit_text += &format!("        ⚠️ Potentially scam: ✅\n");
-    } else if is_potentially_scam == "no" {
-        audit_text += &format!("        ⚠️ Potentially scam: 🔥\n");
-    }
-    // if *sell_tax_min != 0.0 || *sell_tax_max != 0.0 {
-    //     audit_text += &format!("        ⬇️ Sell tax: {sell_tax_min} - {sell_tax_max}\n");
-    // }
-    // if *buy_tax_min != 0.0 || *buy_tax_max != 0.0 {
-    //     audit_text += &format!("        ⬆️ Buy tax: {buy_tax_min} - {buy_tax_max}\n");
-    // }
-   
 
     //token pool
     let client = Client::new();
