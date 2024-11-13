@@ -386,10 +386,6 @@ async fn make_token_overview_message(
         let is_blacklisted = &token_audit.data.is_blacklisted;
         let is_contract_renounced = &token_audit.data.is_contract_renounced;
         let is_potentially_scam = &token_audit.data.is_potentially_scam;
-        // let sell_tax_min = &token_audit.data.sell_tax.min;
-        // let sell_tax_max = &token_audit.data.sell_tax.max;
-        // let buy_tax_min = &token_audit.data.buy_tax.min;
-        // let buy_tax_max = &token_audit.data.buy_tax.max;
 
         audit_text += &format!("🔍 Audit\n");
         if is_open_source    == "yes" {
@@ -432,12 +428,6 @@ async fn make_token_overview_message(
         } else if is_potentially_scam == "no" {
             audit_text += &format!("        ⚠️ Potentially scam: ❌\n");
         }
-        // if *sell_tax_min != 0.0 || *sell_tax_max != 0.0 {
-        //     audit_text += &format!("        ⬇️ Sell tax: {sell_tax_min} - {sell_tax_max}\n");
-        // }
-        // if *buy_tax_min != 0.0 || *buy_tax_max != 0.0 {
-        //     audit_text += &format!("        ⬆️ Buy tax: {buy_tax_min} - {buy_tax_max}\n");
-        // }
     }
 
  
@@ -465,9 +455,6 @@ async fn make_token_overview_message(
 
     Ok(text)
 }
-
-
-
 
 fn num_floating_point(num: &f64, length: i32) -> f64 {
     ((num * 10_f64.powi(length as i32)).round()) / 10_f64.powi(length as i32)
