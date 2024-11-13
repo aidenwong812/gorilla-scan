@@ -11,9 +11,11 @@ use serde_json;
 use std::env;
 use teloxide::{
     prelude::*,
-    types::{Me, MessageKind},
+    types::{Me, MessageKind, ParseMode},
     utils::command::BotCommands,
+    requests::JsonRequest,
 };
+use teloxide::types::LinkPreviewOptions;
 use chrono::{DateTime, Utc};
 use token_info::*;
 use token_price_history::*;
@@ -137,7 +139,15 @@ async fn answer_message(bot: Bot, msg: Message) -> ResponseResult<()> {
                 make_token_overview_message(&token_info, &token_price_history, &token_holders, &token_audit)
                         .await?;
                 bot.send_message(msg.chat.id, text)  // Changed "text" to text
-                        .parse_mode(teloxide::types::ParseMode::Html)
+                        .parse_mode(ParseMode::Html)
+                        .link_preview_options(LinkPreviewOptions {
+                            is_disabled: true,
+                            prefer_small_media: false,
+                            prefer_large_media: false,
+                            show_above_text: false,
+                            url: None,
+                        })
+                        .send()
                         .await?;
             }
             Err(e) => {
