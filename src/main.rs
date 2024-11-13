@@ -353,7 +353,7 @@ async fn make_token_overview_message(
              "🦐"
          };
  
-         let link = format!("<a href=\"https://suiscan.xyz/mainnet/account/{holder_address}?Amount={usd_amount}\">{whale_symbol}</a>");
+         let link = format!("<a href=\"https://apescan.io/address/{holder_address}?Amount={usd_amount}\">{whale_symbol}</a>");
          if index_on_a_line == 9 {
              holders_text = holders_text + &link + "\n        ";
              index_on_a_line = 0;
