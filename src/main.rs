@@ -458,7 +458,7 @@ async fn make_token_overview_message(
             audit_text += &format!("        📊 Slippage modifiable: ❌\n");
         }   
         if is_blacklisted == "yes" {
-            audit_text += &format!("        ⛔ Blacklisted: ✅\n");
+            audit_text += &format!("        ⛔ Blacklisted: ❗\n");
         } else if is_blacklisted == "no" {
             audit_text += &format!("        ⛔ Blacklisted: ❌\n");
         }
@@ -468,7 +468,7 @@ async fn make_token_overview_message(
             audit_text += &format!("        📜 Contract renounced: ❌\n");
         }
         if is_potentially_scam == "yes" {
-            audit_text += &format!("        ⚠️ Potentially scam: ✅\n");
+            audit_text += &format!("        ⚠️ Potentially scam: ❗\n");
         } else if is_potentially_scam == "no" {
             audit_text += &format!("        ⚠️ Potentially scam: ❌\n");
         }
