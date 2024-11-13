@@ -40,9 +40,3 @@ pub struct Tax {
     pub status: String,
 }
 
-// impl TokenAudit {
-//     pub fn data(&self) -> &TokenAuditData {
-//         &self.data
-//     }
-// }
-
