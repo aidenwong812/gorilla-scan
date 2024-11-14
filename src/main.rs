@@ -10,7 +10,7 @@ use reqwest::Client;
 use serde_json;
 use std::env;
 use teloxide::{
-    prelude::*, requests::JsonRequest, types::{Me, MessageKind, ParseMode, TextQuote}, utils::command::BotCommands
+    prelude::*, types::{Me, MessageKind, ParseMode}, utils::command::BotCommands
 };
 use teloxide::types::LinkPreviewOptions;
 use chrono::{DateTime, Utc};
