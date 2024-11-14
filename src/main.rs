@@ -10,10 +10,7 @@ use reqwest::Client;
 use serde_json;
 use std::env;
 use teloxide::{
-    prelude::*,
-    types::{Me, MessageKind, ParseMode},
-    utils::command::BotCommands,
-    requests::JsonRequest,
+    prelude::*, types::{Me, MessageKind, ParseMode}, utils::command::BotCommands
 };
 use teloxide::types::LinkPreviewOptions;
 use chrono::{DateTime, Utc};
@@ -173,11 +170,22 @@ async fn get_token_info(client: Client, token_address: &str) -> Result<TokenInfo
     .await
     .unwrap();
 
-    
-    let text = response.text().await.unwrap();
+    let text = match response.text().await {
+        Ok(text) => {text},
+        Err(e) => {
+            println!("Error fetching token overview: {}", e);
+            // format!(e.to_string());
+            "Error fetching token overview: {e}".to_string()
+        }
+    };
     match serde_json::from_str(&text) {
-        Ok(obj) => Ok(obj),
-        Err(e) =>  Err(e),
+        Ok(obj) => {
+            Ok(obj)
+        },
+        Err(e) =>  {
+            println!("Error parsing JSON: {}", e);
+            Err(e)
+        },
     }
 }
 
@@ -258,18 +266,18 @@ async fn make_token_overview_message(
 
     // Extract token info with proper error handling
     let token_address = &token_info.address;
-    let token_launch_at = &token_info.launch_at;
+    // let token_launch_at = &token_info.launch_at;
     let token_name = &token_info.name;
     let token_symbol = &token_info.symbol;
     let token_total_supply = token_info.total_supply.parse::<f64>().unwrap_or_default() / 10_f64.powi(token_decimal as i32); 
-    // let token_block_timestamp = &token_info.block_timestamp;
+    let token_block_timestamp = &token_info.block_timestamp;
     let token_price = num_floating_point(&(token_info.price.parse::<f64>().unwrap_or_default() * native_token_price), 5);
     let token_liquidity = token_info.liquidity.clone().unwrap_or_default();
     let liquidity = controll_big_float(token_liquidity.native_reserve.parse::<f64>().unwrap_or_default() / 10_f64.powi(token_decimal as i32) * native_token_price * 2.0);
     
     let market_cap = controll_big_float(token_total_supply * token_price);
-    let age = if let Some(launch_time) = token_launch_at {
-        calculate_age(launch_time)
+    let age = if let Some(block_time) = token_block_timestamp {
+        calculate_age(block_time)
     } else {
         "🔥".to_string()
     };
@@ -433,7 +441,6 @@ async fn make_token_overview_message(
  
     let text = format!("
 <a href=\"https://dexscreener.com/apechain/{token_address}\">🚀</a> {token_name}  {token_symbol}
-🌐 ApeChain @ Camelot
 💰 USD:  ${token_price}
 💎 Mcap:  ${market_cap}
 💦 Liquidity:  ${liquidity}
