@@ -170,8 +170,6 @@ async fn get_token_info(client: Client, token_address: &str) -> Result<TokenInfo
     .await
     .unwrap();
 
-    println!("Response: {:?}", response);
-    
     let text = match response.text().await {
         Ok(text) => {text},
         Err(e) => {
