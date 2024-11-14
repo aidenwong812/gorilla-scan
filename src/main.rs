@@ -433,7 +433,6 @@ async fn make_token_overview_message(
  
     let text = format!("
 <a href=\"https://dexscreener.com/apechain/{token_address}\">🚀</a> {token_name}  {token_symbol}
-🌐 ApeChain @ Camelot
 💰 USD:  ${token_price}
 💎 Mcap:  ${market_cap}
 💦 Liquidity:  ${liquidity}
