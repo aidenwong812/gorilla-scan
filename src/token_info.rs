@@ -1,3 +1,5 @@
+use std::option;
+
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -15,9 +17,9 @@ pub struct TokenInfo {
     pub total_burned: String,
     pub creator: String,
     #[serde(rename = "blockTimestamp")]
-    pub block_timestamp: String,
+    pub block_timestamp: Option<String>,
     #[serde(rename = "lootCounter")]
-    pub loot_counter: String,
+    pub loot_counter: Option<String>,
     pub bonding_curve: Option<BondingCurve>,
     pub liquidity: Option<Liquidity>,
     #[serde(rename = "isProfane")]
