@@ -130,10 +130,10 @@ async fn answer_message(bot: Bot, msg: Message) -> ResponseResult<()> {
             Ok(token_info) => {
                 let token_price_history = get_token_price_history(request_client.clone(), &dextools_api_key, &dextools_api_plan, &token_adr).await.unwrap_or_default();
                 let token_holders = get_holders(request_client.clone(), &token_adr).await.unwrap_or_default();
-                let token_audit = get_token_audit(request_client.clone(), &dextools_api_key, &dextools_api_plan, &token_adr).await.unwrap_or_default();
+                // let token_audit = get_token_audit(request_client.clone(), &dextools_api_key, &dextools_api_plan, &token_adr).await.unwrap_or_default();
                 //make message
                 let text =
-                make_token_overview_message(&token_info, &token_price_history, &token_holders, &token_audit)
+                make_token_overview_message(&token_info, &token_price_history, &token_holders)
                         .await?;
                 bot.send_message(msg.chat.id, text)  // Changed "text" to text
                         .parse_mode(ParseMode::Html)
@@ -209,24 +209,24 @@ async fn get_token_price_history(client: Client, api_key: &str, api_plan: &str, 
     }
 }
 
-async fn get_token_audit(client: Client, api_key: &str, api_plan: &str, token_address: &str) -> Result<TokenAudit, serde_json::Error> {
-    let url = format!(
-        "https://public-api.dextools.io/{}/v2/token/{}/{}/audit",
-        api_plan, "apechain", token_address
-    );
-    let response = client
-    .get(&url)
-    .header("X-API-KEY", api_key)
-    .send()
-    .await
-    .unwrap();
+// async fn get_token_audit(client: Client, api_key: &str, api_plan: &str, token_address: &str) -> Result<TokenAudit, serde_json::Error> {
+//     let url = format!(
+//         "https://public-api.dextools.io/{}/v2/token/{}/{}/audit",
+//         api_plan, "apechain", token_address
+//     );
+//     let response = client
+//     .get(&url)
+//     .header("X-API-KEY", api_key)
+//     .send()
+//     .await
+//     .unwrap();
 
-    let text = response.text().await.unwrap();
-    match serde_json::from_str(&text) {
-        Ok(obj) => Ok(obj),
-        Err(e) =>  Err(e),
-    }
-}
+//     let text = response.text().await.unwrap();
+//     match serde_json::from_str(&text) {
+//         Ok(obj) => Ok(obj),
+//         Err(e) =>  Err(e),
+//     }
+// }
 
 async fn get_holders(
     client: Client,
@@ -253,7 +253,7 @@ async fn make_token_overview_message(
     token_info: &TokenInfo,
     token_price_history: &TokenPriceHistory,
     token_top_holders: &TokenTopHolders,
-    token_audit: &TokenAudit,
+    // token_audit: &TokenAudit,
 ) -> Result<String, reqwest::Error> {
 
     let token_decimal = 18;
@@ -380,67 +380,73 @@ async fn make_token_overview_message(
             }
          }
      }
-    let sum_usd_amount_top_10_holders = controll_big_float(sum_usd_amount_top_10_holders);
 
-    //token audit
-    let mut audit_text = String::new();
-    let token_audit_status = &token_audit.status_code;
-    if *token_audit_status == 200 {
-        let is_open_source = &token_audit.data.is_open_source;
-        let is_honeypot = &token_audit.data.is_honeypot;
-        let is_mintable = &token_audit.data.is_mintable;
-        let is_proxy = &token_audit.data.is_proxy;
-        let slippage_modifiable = &token_audit.data.slippage_modifiable;
-        let is_blacklisted = &token_audit.data.is_blacklisted;
-        let is_contract_renounced = &token_audit.data.is_contract_renounced;
-        let is_potentially_scam = &token_audit.data.is_potentially_scam;
+    let percentage_top_10_holders = if sum_usd_amount_top_10_holders > 0.0 {
+        (sum_usd_amount_top_10_holders / token_total_supply / token_price * 100.0).round()
+    } else {
+        0.0
+    };
+    let percentage_top_10_holders = controll_big_float(percentage_top_10_holders);
 
-        audit_text += &format!("🔍 Audit\n");
-        if is_open_source    == "yes" {
-            audit_text += &format!("        🔓 Open source: ✅\n");
-        } else if is_open_source == "no" {
-            audit_text += &format!("        🔓 Open source: ❌\n");
-        }
-        if is_honeypot == "yes" {
-            audit_text += &format!("        🍯 Honeypot: ✅\n");
-        } else if is_honeypot == "no" {
-            audit_text += &format!("        🍯 Honeypot: ❌\n");
-        }
-        if is_mintable == "yes" {  
-            audit_text += &format!("        🖨 Mintable: ✅\n");
-        } else if is_mintable == "no" {
-            audit_text += &format!("        🖨 Mintable: ❌\n");
-        }   
-        if is_proxy == "yes" {
-            audit_text += &format!("        🔄 Proxy: ✅\n");
-        } else if is_proxy == "no" {
-            audit_text += &format!("        🔄 Proxy: ❌\n");
-        }   
-        if slippage_modifiable == "yes" {
-            audit_text += &format!("        📊 Slippage modifiable: ✅\n");
-        } else if slippage_modifiable == "no" {
-            audit_text += &format!("        📊 Slippage modifiable: ❌\n");
-        }   
-        if is_blacklisted == "yes" {
-            audit_text += &format!("        ⛔ Blacklisted: ❗\n");
-        } else if is_blacklisted == "no" {
-            audit_text += &format!("        ⛔ Blacklisted: ❌\n");
-        }
-        if is_contract_renounced == "yes" {
-            audit_text += &format!("        📜 Contract renounced: ✅\n");
-        } else if is_contract_renounced == "no" {
-            audit_text += &format!("        📜 Contract renounced: ❌\n");
-        }
-        if is_potentially_scam == "yes" {
-            audit_text += &format!("        ⚠️ Potentially scam: ❗\n");
-        } else if is_potentially_scam == "no" {
-            audit_text += &format!("        ⚠️ Potentially scam: ❌\n");
-        }
-    }
+    // //token audit
+    // let mut audit_text = String::new();
+    // let token_audit_status = &token_audit.status_code;
+    // if *token_audit_status == 200 {
+    //     let is_open_source = &token_audit.data.is_open_source;
+    //     let is_honeypot = &token_audit.data.is_honeypot;
+    //     let is_mintable = &token_audit.data.is_mintable;
+    //     let is_proxy = &token_audit.data.is_proxy;
+    //     let slippage_modifiable = &token_audit.data.slippage_modifiable;
+    //     let is_blacklisted = &token_audit.data.is_blacklisted;
+    //     let is_contract_renounced = &token_audit.data.is_contract_renounced;
+    //     let is_potentially_scam = &token_audit.data.is_potentially_scam;
+
+    //     audit_text += &format!("🔍 Audit\n");
+    //     if is_open_source    == "yes" {
+    //         audit_text += &format!("        🔓 Open source: ✅\n");
+    //     } else if is_open_source == "no" {
+    //         audit_text += &format!("        🔓 Open source: ❌\n");
+    //     }
+    //     if is_honeypot == "yes" {
+    //         audit_text += &format!("        🍯 Honeypot: ✅\n");
+    //     } else if is_honeypot == "no" {
+    //         audit_text += &format!("        🍯 Honeypot: ❌\n");
+    //     }
+    //     if is_mintable == "yes" {  
+    //         audit_text += &format!("        🖨 Mintable: ✅\n");
+    //     } else if is_mintable == "no" {
+    //         audit_text += &format!("        🖨 Mintable: ❌\n");
+    //     }   
+    //     if is_proxy == "yes" {
+    //         audit_text += &format!("        🔄 Proxy: ✅\n");
+    //     } else if is_proxy == "no" {
+    //         audit_text += &format!("        🔄 Proxy: ❌\n");
+    //     }   
+    //     if slippage_modifiable == "yes" {
+    //         audit_text += &format!("        📊 Slippage modifiable: ✅\n");
+    //     } else if slippage_modifiable == "no" {
+    //         audit_text += &format!("        📊 Slippage modifiable: ❌\n");
+    //     }   
+    //     if is_blacklisted == "yes" {
+    //         audit_text += &format!("        ⛔ Blacklisted: ❗\n");
+    //     } else if is_blacklisted == "no" {
+    //         audit_text += &format!("        ⛔ Blacklisted: ❌\n");
+    //     }
+    //     if is_contract_renounced == "yes" {
+    //         audit_text += &format!("        📜 Contract renounced: ✅\n");
+    //     } else if is_contract_renounced == "no" {
+    //         audit_text += &format!("        📜 Contract renounced: ❌\n");
+    //     }
+    //     if is_potentially_scam == "yes" {
+    //         audit_text += &format!("        ⚠️ Potentially scam: ❗\n");
+    //     } else if is_potentially_scam == "no" {
+    //         audit_text += &format!("        ⚠️ Potentially scam: ❌\n");
+    //     }
+    // }
 
  
     let text = format!("
-<a href=\"https://dexscreener.com/apechain/{token_address}\">🚀</a> {token_name}  {token_symbol}
+<a href=\"https://dexscreener.com/apechain/{token_address}\">🚀</a> {token_name}  ${token_symbol}
 💰 USD:  ${token_price}
 💎 Mcap:  ${market_cap}
 💦 Liquidity:  ${liquidity}
@@ -448,10 +454,10 @@ async fn make_token_overview_message(
         └ <i>1H:</i>    ${price_1h} / {variation_1h}%  
         └ <i>6H:</i>    ${price_6h} / {variation_6h}%  
         └ <i>24H:</i>  ${price_24h} / {variation_24h}% 
-{audit_text}🕐 Age:  {age}
+🕐 Age:  {age}
 🧰 More: {social_text}
 👩‍👧‍👦 Holders: {holders_count}
-        └ Top 10 Holders :  ${sum_usd_amount_top_10_holders}
+        └ Top 10 Holders :  {percentage_top_10_holders}%
 {holders_text} 
 <code>{token_address}</code>
 <a href=\"https://dexscreener.com/apechain/{token_address}\">DEX</a> <a href=\"https://apescan.io/address/{token_address}\">EXP</a>
