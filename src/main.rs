@@ -460,7 +460,7 @@ async fn make_token_overview_message(
         └ Top 10 Holders :  {percentage_top_10_holders}%
 {holders_text} 
 <code>{token_address}</code>
-<a href=\"https://dexscreener.com/apechain/{token_address}\">DEX</a> <a href=\"https://apescan.io/address/{token_address}\">EXP</a>
+<a href=\"https://ape.express/explore/{token_address}?\">AX</a> <a href=\"https://dexscreener.com/apechain/{token_address}\">DEX</a> <a href=\"https://apescan.io/address/{token_address}\">EXP</a>
 
 ❎ <a href=\"https://twitter.com/search?q={token_address}=typed_query&f=live\"> Search on 𝕏 </a>
 📈 <a href=\"https://apescan.io/token/{token_address}\"> APE Scan </a>
